@@ -30,6 +30,21 @@ app.use('/api/notes', noteRoutes);
 app.use('/api/audio', audioRoutes);
 app.use('/api/ai', aiRoutes);
 
+
+// Health check endpoints
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "OK",
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || "development",
+  });
+});
+
+app.head("/health", (req, res) => {
+  res.status(200).end();
+});
+
+
 // Error Handling
 app.use(notFound);
 app.use(errorHandler);
