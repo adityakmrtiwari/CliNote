@@ -121,10 +121,18 @@ export default function Dashboard() {
         const sortedNotes = [...notesResult.data]
           .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
           .slice(0, 3)
-          .map(note => ({
-            ...note,
-            patientName: patientMap.get(note.patientId) || 'Unknown Patient',
-          }));
+          .map(note => {
+            // note.patientId may be populated (object) by the backend or just an ID string.
+            const pid = (note as any).patientId;
+            const patientIdKey = typeof pid === 'string' ? pid : pid?._id;
+            const patientNameFromPopulate = typeof pid === 'object' && pid?.name ? pid.name : undefined;
+            const patientName = patientNameFromPopulate || patientMap.get(patientIdKey) || 'Unknown Patient';
+
+            return {
+              ...note,
+              patientName,
+            } as DashboardNote;
+          });
         setRecentNotes(sortedNotes);
       }
 
