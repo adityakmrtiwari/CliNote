@@ -10,7 +10,7 @@ const noteSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Patient',
     required: true,
-    unique: true // Ensure only one note per patient
+    // unique index is created below with noteSchema.index({ patientId: 1 }, { unique: true })
   },
   templateType: {
     type: String,

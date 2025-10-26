@@ -10,7 +10,7 @@ const userSchema = new mongoose.Schema(
     email: {
       type: String,
       required: [true, "Email is required"],
-      unique: true,
+      // unique index is created below with userSchema.index({ email: 1 }, { unique: true })
       lowercase: true,
       trim: true,
       // index: true, // Removed to avoid duplicate index warning
