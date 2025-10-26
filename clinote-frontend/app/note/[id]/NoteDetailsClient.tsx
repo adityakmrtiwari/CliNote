@@ -37,7 +37,10 @@ export default function NoteDetailsClient({ noteId }: { noteId: string }) {
           setNote(fetchedNote);
           setEditedNote(fetchedNote.aiGeneratedNote);
 
-          const patientResult = await apiService.getPatientById(fetchedNote.patientId);
+          // patientId may be a string id or a populated Patient object — normalize to string id
+          const patientIdStr = typeof fetchedNote.patientId === 'string' ? fetchedNote.patientId : fetchedNote.patientId._id;
+
+          const patientResult = await apiService.getPatientById(patientIdStr);
           if (patientResult.success && patientResult.data) {
             setPatient(patientResult.data);
           } else {
@@ -68,7 +71,8 @@ export default function NoteDetailsClient({ noteId }: { noteId: string }) {
         plan: editedNote.plan || '',
       };
       
-      const result = await apiService.updateNoteByPatient(note.patientId, { aiGeneratedNote: completeAiNote });
+  const patientIdStr = typeof note.patientId === 'string' ? note.patientId : note.patientId._id;
+  const result = await apiService.updateNoteByPatient(patientIdStr, { aiGeneratedNote: completeAiNote });
 
       if (result.success && result.data) {
         setNote(result.data);

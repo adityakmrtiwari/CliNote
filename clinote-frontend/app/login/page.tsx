@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -11,11 +11,30 @@ import { Stethoscope, Mail, Lock, AlertCircle } from 'lucide-react';
 import { apiService } from '@/lib/api';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+  });
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const router = useRouter();
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  useEffect(() => {
+    // Check if user is already logged in
+    if (apiService.isAuthenticated()) {
+      router.replace('/dashboard');
+    } else {
+      setIsLoading(false);
+    }
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,10 +42,9 @@ export default function Login() {
     setError('');
 
     try {
-      const result = await apiService.login(email, password);
-      
+      const result = await apiService.login(formData.email, formData.password);
       if (result.success) {
-        router.push('/dashboard');
+        router.replace('/dashboard');
       } else {
         setError(result.message || 'Login failed');
       }
@@ -50,58 +68,68 @@ export default function Login() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2">
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <span className="text-sm text-red-700">{error}</span>
-            </div>
-          )}
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-slate-700">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="doctor@hospital.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10"
-                  required
-                />
+          <div className="space-y-4">
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <span className="text-sm text-red-700">{error}</span>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-slate-700">Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10"
-                  required
-                />
+            )}
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
               </div>
+            ) : (
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-slate-700">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      placeholder="doctor@hospital.com"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-slate-700">Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                    <Input
+                      id="password"
+                      name="password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+                <Button 
+                  type="submit" 
+                  className="w-full bg-blue-600 hover:bg-blue-700"
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Signing in...' : 'Sign In'}
+                </Button>
+              </form>
+            )}
+            <div className="mt-6 text-center">
+              <p className="text-sm text-slate-600">
+                Don't have an account?{' '}
+                <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium">
+                  Register here
+                </Link>
+              </p>
             </div>
-            <Button 
-              type="submit" 
-              className="w-full bg-blue-600 hover:bg-blue-700"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Signing in...' : 'Sign In'}
-            </Button>
-          </form>
-          <div className="mt-6 text-center">
-            <p className="text-sm text-slate-600">
-              Don't have an account?{' '}
-              <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium">
-                Register here
-              </Link>
-            </p>
           </div>
         </CardContent>
       </Card>
