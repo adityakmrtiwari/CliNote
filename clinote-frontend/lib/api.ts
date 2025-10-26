@@ -27,7 +27,8 @@ interface Patient {
 interface Note {
   _id: string;
   userId: string;
-  patientId: string;
+  // patientId can be a string id or a populated Patient object returned by the backend
+  patientId: string | Patient;
   templateType: 'SOAP' | 'PROGRESS' | 'CONSULTATION' | 'DISCHARGE' | 'General Medicine';
   transcript: string;
   aiGeneratedNote: {

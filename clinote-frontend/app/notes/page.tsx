@@ -70,12 +70,24 @@ export default function NotesPage() {
       
       const result = await apiService.getAllNotes();
       
-      if (result.success && result.data) {
-        // Load patient information for each note
+        if (result.success && result.data) {
+        // Load patient information for each note. Backend may return a populated patient object
         const notesWithPatients = await Promise.all(
           result.data.map(async (note) => {
             try {
-              const patientResult = await apiService.getPatientById(note.patientId);
+              // If backend already populated patientId with patient object, use it directly
+              const pid = (note as any).patientId;
+              if (typeof pid === 'object' && pid?.name) {
+                return {
+                  ...note,
+                  patientName: pid.name,
+                  patientAge: pid.age,
+                  patientGender: pid.gender,
+                };
+              }
+
+              // Otherwise, fetch patient by id
+              const patientResult = await apiService.getPatientById(String(note.patientId));
               return {
                 ...note,
                 patientName: patientResult.success && patientResult.data ? patientResult.data.name : 'Unknown Patient',
