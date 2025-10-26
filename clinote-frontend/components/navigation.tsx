@@ -11,9 +11,14 @@ export default function Navigation() {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userName, setUserName] = useState<string | null>(null);
 
   const handleLogout = () => {
     apiService.logout();
+    setIsAuthenticated(false);
+    setUserName(null);
+    // navigate to login
     router.push('/login');
   };
 
@@ -32,6 +37,25 @@ export default function Navigation() {
       document.body.classList.remove('overflow-hidden');
     }
   }, [mobileMenuOpen]);
+
+  // Initialize auth state on mount and listen for storage changes (cross-tab login/logout)
+  useEffect(() => {
+    const updateAuth = () => {
+      const auth = apiService.isAuthenticated();
+      setIsAuthenticated(auth);
+      const user = apiService.getCurrentUser();
+      setUserName(user?.name ?? null);
+    };
+
+    updateAuth();
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'clinote_user') updateAuth();
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   // Close menu on ESC
   useEffect(() => {
@@ -76,15 +100,23 @@ export default function Navigation() {
 
           {/* Logout (Desktop) */}
           <div className="hidden md:block">
-            <Button
-              onClick={handleLogout}
-              variant="outline"
-              size="sm"
-              className="flex items-center space-x-1"
-            >
-              <LogOut className="h-4 w-4" />
-              <span>Logout</span>
-            </Button>
+            {isAuthenticated ? (
+              <Button
+                onClick={handleLogout}
+                variant="outline"
+                size="sm"
+                className="flex items-center space-x-1"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Logout</span>
+              </Button>
+            ) : (
+              <Link href="/login">
+                <Button variant="outline" size="sm" className="flex items-center space-x-1">
+                  <span>Login</span>
+                </Button>
+              </Link>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -137,18 +169,31 @@ export default function Navigation() {
               <span>{label}</span>
             </Link>
           ))}
-          <Button
-            onClick={() => {
-              setMobileMenuOpen(false);
-              handleLogout();
-            }}
-            variant="outline"
-            size="sm"
-            className="flex items-center space-x-1"
-          >
-            <LogOut className="h-4 w-4" />
-            <span>Logout</span>
-          </Button>
+          {isAuthenticated ? (
+            <Button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                handleLogout();
+              }}
+              variant="outline"
+              size="sm"
+              className="flex items-center space-x-1"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Logout</span>
+            </Button>
+          ) : (
+            <Link href="/login">
+              <Button
+                onClick={() => setMobileMenuOpen(false)}
+                variant="outline"
+                size="sm"
+                className="flex items-center space-x-1"
+              >
+                <span>Login</span>
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
     </nav>
