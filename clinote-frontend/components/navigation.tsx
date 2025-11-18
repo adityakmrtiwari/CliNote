@@ -13,6 +13,7 @@ export default function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
+  const [tokenExpiry, setTokenExpiry] = useState<string | null>(null);
 
   const handleLogout = () => {
     apiService.logout();
@@ -40,11 +41,53 @@ export default function Navigation() {
 
   // Initialize auth state on mount and listen for storage changes (cross-tab login/logout)
   useEffect(() => {
-    const updateAuth = () => {
-      const auth = apiService.isAuthenticated();
-      setIsAuthenticated(auth);
+    // Decode JWT payload to extract expiry
+    const decodeExpiry = (token: string | undefined | null): string | null => {
+      if (!token) return null;
+      try {
+        const parts = token.split('.');
+        if (parts.length !== 3) return null;
+        // base64url -> base64
+        const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        // add padding
+        const pad = payload.length % 4;
+        const padded = payload + (pad === 2 ? '==' : pad === 3 ? '=' : pad === 0 ? '' : '');
+        const decoded = atob(padded);
+        const obj = JSON.parse(decoded);
+        if (!obj.exp) return null;
+        const d = new Date(obj.exp * 1000);
+        return d.toLocaleString();
+      } catch (err) {
+        return null;
+      }
+    };
+
+    const updateAuth = async () => {
       const user = apiService.getCurrentUser();
-      setUserName(user?.name ?? null);
+      if (!user?.token) {
+        setIsAuthenticated(false);
+        setUserName(null);
+        setTokenExpiry(null);
+        return;
+      }
+
+      // Try to validate token with profile endpoint. If invalid, apiService will handle 401.
+      try {
+        const profile = await apiService.getProfile();
+        if (profile?.data) {
+          setIsAuthenticated(true);
+          setUserName(profile.data.name ?? user.name ?? null);
+          setTokenExpiry(decodeExpiry(user.token));
+        } else {
+          setIsAuthenticated(false);
+          setUserName(null);
+          setTokenExpiry(null);
+        }
+      } catch (err) {
+        setIsAuthenticated(false);
+        setUserName(null);
+        setTokenExpiry(null);
+      }
     };
 
     updateAuth();
@@ -99,17 +142,25 @@ export default function Navigation() {
           </div>
 
           {/* Logout (Desktop) */}
-          <div className="hidden md:block">
+          <div className="hidden md:flex items-center space-x-4">
             {isAuthenticated ? (
-              <Button
-                onClick={handleLogout}
-                variant="outline"
-                size="sm"
-                className="flex items-center space-x-1"
-              >
-                <LogOut className="h-4 w-4" />
-                <span>Logout</span>
-              </Button>
+              <div className="flex items-center space-x-3">
+                <div className="text-sm text-slate-700">
+                  <div className="font-medium">{userName}</div>
+                  {tokenExpiry && (
+                    <div className="text-xs text-slate-500">Expires: {tokenExpiry}</div>
+                  )}
+                </div>
+                <Button
+                  onClick={handleLogout}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center space-x-1"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Logout</span>
+                </Button>
+              </div>
             ) : (
               <Link href="/login">
                 <Button variant="outline" size="sm" className="flex items-center space-x-1">
@@ -154,6 +205,12 @@ export default function Navigation() {
           </Button>
         </div>
         <div className="flex flex-col space-y-4 p-4">
+          {isAuthenticated && (
+            <div className="px-2 py-1 border rounded-md">
+              <div className="font-medium text-slate-800">{userName}</div>
+              {tokenExpiry && <div className="text-xs text-slate-500">Expires: {tokenExpiry}</div>}
+            </div>
+          )}
           {navLinks.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
