@@ -13,7 +13,7 @@ export default function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
-  const [tokenExpiry, setTokenExpiry] = useState<string | null>(null);
+  
 
   const handleLogout = () => {
     apiService.logout();
@@ -41,33 +41,11 @@ export default function Navigation() {
 
   // Initialize auth state on mount and listen for storage changes (cross-tab login/logout)
   useEffect(() => {
-    // Decode JWT payload to extract expiry
-    const decodeExpiry = (token: string | undefined | null): string | null => {
-      if (!token) return null;
-      try {
-        const parts = token.split('.');
-        if (parts.length !== 3) return null;
-        // base64url -> base64
-        const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-        // add padding
-        const pad = payload.length % 4;
-        const padded = payload + (pad === 2 ? '==' : pad === 3 ? '=' : pad === 0 ? '' : '');
-        const decoded = atob(padded);
-        const obj = JSON.parse(decoded);
-        if (!obj.exp) return null;
-        const d = new Date(obj.exp * 1000);
-        return d.toLocaleString();
-      } catch (err) {
-        return null;
-      }
-    };
-
     const updateAuth = async () => {
       const user = apiService.getCurrentUser();
       if (!user?.token) {
         setIsAuthenticated(false);
         setUserName(null);
-        setTokenExpiry(null);
         return;
       }
 
@@ -77,27 +55,33 @@ export default function Navigation() {
         if (profile?.data) {
           setIsAuthenticated(true);
           setUserName(profile.data.name ?? user.name ?? null);
-          setTokenExpiry(decodeExpiry(user.token));
         } else {
           setIsAuthenticated(false);
           setUserName(null);
-          setTokenExpiry(null);
         }
       } catch (err) {
         setIsAuthenticated(false);
         setUserName(null);
-        setTokenExpiry(null);
+        
       }
     };
 
     updateAuth();
 
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'clinote_user') updateAuth();
+    const handleStorage = (e: StorageEvent | Event) => {
+      // storage events from other tabs have a `key` property; our custom event does not.
+      if ((e as StorageEvent).key === 'clinote_user' || e.type === 'clinote_user_change') {
+        updateAuth();
+      }
     };
 
     window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+    // Listen to custom same-tab event dispatched on logout/login
+    window.addEventListener('clinote_user_change', handleStorage as EventListener);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('clinote_user_change', handleStorage as EventListener);
+    };
   }, []);
 
   // Close menu on ESC
@@ -147,9 +131,7 @@ export default function Navigation() {
               <div className="flex items-center space-x-3">
                 <div className="text-sm text-slate-700">
                   <div className="font-medium">{userName}</div>
-                  {tokenExpiry && (
-                    <div className="text-xs text-slate-500">Expires: {tokenExpiry}</div>
-                  )}
+                  
                 </div>
                 <Button
                   onClick={handleLogout}
@@ -208,7 +190,6 @@ export default function Navigation() {
           {isAuthenticated && (
             <div className="px-2 py-1 border rounded-md">
               <div className="font-medium text-slate-800">{userName}</div>
-              {tokenExpiry && <div className="text-xs text-slate-500">Expires: {tokenExpiry}</div>}
             </div>
           )}
           {navLinks.map(({ href, label, icon: Icon }) => (

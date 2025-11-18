@@ -252,6 +252,10 @@ class ApiService {
   // Utility methods
   logout(): void {
     localStorage.removeItem('clinote_user');
+    // Dispatch a custom event so same-tab listeners can react to logout immediately
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('clinote_user_change'));
+    }
   }
 
   isAuthenticated(): boolean {
