@@ -15,10 +15,15 @@ const { notFound, errorHandler } = require('./middlewares/errorMiddleware');
 const app = express();
 
 // ✅ Environment-based CORS origin setup
+// Ensure the deployed frontend origin is set in CORS_ORIGIN (e.g. https://clinote.vercel.app)
+// Do not use wildcard '*' with credentials: true. We don't use cookie-based auth here,
+// so `credentials` is turned off and we explicitly allow the Authorization header.
 const allowedOrigin = process.env.CORS_ORIGIN || '*';
 app.use(cors({
   origin: allowedOrigin,
-  credentials: true,
+  credentials: false,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 app.use(express.json());

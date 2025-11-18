@@ -60,12 +60,27 @@ class ApiService {
   }
 
   private async handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.message || 'API request failed');
+    let data: any = {};
+    try {
+      data = await response.json();
+    } catch (e) {
+      // non-json response
     }
-    
+
+    if (!response.ok) {
+      // If unauthorized, clear stored user and redirect to login (if running in browser)
+      if (response.status === 401) {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('clinote_user');
+          // navigate to login page so UI doesn't stay in a logged-in state
+          window.location.href = '/login';
+        }
+        throw new Error(data?.message || 'Not authorized, please login again');
+      }
+
+      throw new Error(data?.message || 'API request failed');
+    }
+
     return data;
   }
 
