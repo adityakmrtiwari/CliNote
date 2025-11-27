@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Navigation from '@/components/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Users, Search, Plus, AlertCircle, Loader2, User, Calendar } from 'lucide-react';
+import { Users, Search, Plus, AlertCircle, User, Calendar } from 'lucide-react';
 import { apiService, type Patient } from '@/lib/api';
+import { useAuth } from '@/components/auth-provider';
 
 export default function PatientsPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -16,19 +16,20 @@ export default function PatientsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
-    const userData = apiService.getCurrentUser();
-    if (!userData) {
+    if (!authLoading && !isAuthenticated) {
       router.push('/login');
       return;
     }
 
-    loadPatients();
-  }, [router]);
+    if (isAuthenticated) {
+      loadPatients();
+    }
+  }, [authLoading, isAuthenticated, router]);
 
   useEffect(() => {
-    // Filter patients based on search term
     if (searchTerm.trim() === '') {
       setFilteredPatients(patients);
     } else {
@@ -45,12 +46,11 @@ export default function PatientsPage() {
     try {
       setIsLoading(true);
       setError('');
-      
+
       const result = await apiService.getAllPatients();
-      
+
       if (result.success && result.data) {
-        // Sort patients by most recently updated
-        const sortedPatients = result.data.sort((a, b) => 
+        const sortedPatients = result.data.sort((a, b) =>
           new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
         );
         setPatients(sortedPatients);
@@ -73,10 +73,9 @@ export default function PatientsPage() {
     router.push('/create-note');
   };
 
-  if (isLoading) {
+  if (authLoading || (isAuthenticated && isLoading)) {
     return (
       <div className="min-h-screen bg-slate-50">
-        <Navigation />
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -87,10 +86,12 @@ export default function PatientsPage() {
     );
   }
 
+  if (!isAuthenticated) {
+    return null; // Will redirect
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
-      <Navigation />
-      
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
@@ -98,7 +99,7 @@ export default function PatientsPage() {
               <h1 className="text-3xl font-bold text-slate-800 mb-2">Patients</h1>
               <p className="text-slate-600">Manage your patient records and medical notes</p>
             </div>
-            <Button 
+            <Button
               onClick={handleCreateNote}
               className="bg-blue-600 hover:bg-blue-700"
             >
@@ -107,7 +108,6 @@ export default function PatientsPage() {
             </Button>
           </div>
 
-          {/* Search Bar */}
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
             <Input
@@ -126,7 +126,6 @@ export default function PatientsPage() {
           </div>
         )}
 
-        {/* Patients Grid */}
         {filteredPatients.length === 0 ? (
           <Card>
             <CardContent className="py-12">
@@ -136,13 +135,13 @@ export default function PatientsPage() {
                   {patients.length === 0 ? 'No Patients Yet' : 'No Patients Found'}
                 </h3>
                 <p className="text-slate-600 mb-6">
-                  {patients.length === 0 
+                  {patients.length === 0
                     ? 'Start by creating your first patient record and medical note.'
                     : `No patients match "${searchTerm}". Try adjusting your search.`
                   }
                 </p>
                 {patients.length === 0 && (
-                  <Button 
+                  <Button
                     onClick={handleCreateNote}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
@@ -156,7 +155,7 @@ export default function PatientsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredPatients.map((patient) => (
-              <Card 
+              <Card
                 key={patient._id}
                 className="hover:shadow-lg transition-shadow cursor-pointer"
                 onClick={() => handlePatientClick(patient._id)}
@@ -193,11 +192,11 @@ export default function PatientsPage() {
                       </span>
                     </div>
                   </div>
-                  
+
                   <div className="mt-4 pt-4 border-t">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className="w-full"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -213,7 +212,6 @@ export default function PatientsPage() {
           </div>
         )}
 
-        {/* Summary Stats */}
         {patients.length > 0 && (
           <Card className="mt-8">
             <CardHeader>

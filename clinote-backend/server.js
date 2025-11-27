@@ -13,6 +13,9 @@ const aiRoutes = require('./routes/aiRoutes');
 const { notFound, errorHandler } = require('./middlewares/errorMiddleware');
 
 const app = express();
+const helmet = require('helmet');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 
 // ✅ Environment-based CORS origin setup
 // Ensure the deployed frontend origin is set in CORS_ORIGIN (e.g. https://clinote.vercel.app)
@@ -25,6 +28,23 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+// Security Headers
+// Configure Helmet to allow Cross-Origin Resource Sharing (CORS)
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+
+// Gzip Compression
+app.use(compression());
+
+// Rate Limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // Limit each IP to 1000 requests per windowMs (Increased for dev/testing)
+  message: 'Too many requests from this IP, please try again later.'
+});
+app.use(limiter);
 
 app.use(express.json());
 

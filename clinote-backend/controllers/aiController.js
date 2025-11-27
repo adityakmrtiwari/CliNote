@@ -122,21 +122,16 @@ Ensure:
     // Sanitize AI output to match schema (convert arrays -> strings, objects -> JSON)
     const sanitizedAIGeneratedNote = sanitizeAIGeneratedNote(aiGeneratedNote);
 
-    // Save or atomically upsert note to avoid duplicate key race conditions
-    const update = {
+    // Create a NEW note document (do not overwrite existing ones)
+    note = await Note.create({
+      userId: req.user._id,
+      patientId,
       templateType,
       transcript,
       aiGeneratedNote: sanitizedAIGeneratedNote,
-      status: "completed",
-    };
-
-    if (audioUrl) update.audioUrl = audioUrl;
-
-    note = await Note.findOneAndUpdate(
-      { patientId, userId: req.user._id },
-      { $set: update, $setOnInsert: { userId: req.user._id, patientId } },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
+      audioUrl: audioUrl || undefined,
+      status: "completed"
+    });
 
     return sendSuccessResponse(
       res,

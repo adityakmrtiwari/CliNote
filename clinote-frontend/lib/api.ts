@@ -91,13 +91,13 @@ class ApiService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, email, password }),
     });
-    
+
     const result = await this.handleResponse<User>(response);
-    
+
     if (result.success && result.data) {
       localStorage.setItem('clinote_user', JSON.stringify(result.data));
     }
-    
+
     return result;
   }
 
@@ -107,13 +107,13 @@ class ApiService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
     });
-    
+
     const result = await this.handleResponse<User>(response);
-    
+
     if (result.success && result.data) {
       localStorage.setItem('clinote_user', JSON.stringify(result.data));
     }
-    
+
     return result;
   }
 
@@ -122,7 +122,7 @@ class ApiService {
       method: 'GET',
       headers: this.getAuthHeaders(),
     });
-    
+
     return this.handleResponse<User>(response);
   }
 
@@ -133,7 +133,7 @@ class ApiService {
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ name, age, gender }),
     });
-    
+
     return this.handleResponse<Patient>(response);
   }
 
@@ -142,7 +142,7 @@ class ApiService {
       method: 'GET',
       headers: this.getAuthHeaders(),
     });
-    
+
     return this.handleResponse<Patient[]>(response);
   }
 
@@ -151,7 +151,7 @@ class ApiService {
       method: 'GET',
       headers: this.getAuthHeaders(),
     });
-    
+
     return this.handleResponse<Patient>(response);
   }
 
@@ -160,18 +160,18 @@ class ApiService {
       method: 'DELETE',
       headers: this.getAuthHeaders(),
     });
-    
+
     return this.handleResponse<void>(response);
   }
 
   // Note endpoints
-  async createOrUpdateNote(patientId: string, templateType: string, transcript: string): Promise<ApiResponse<Note>> {
+  async createNote(patientId: string, templateType: string, transcript: string): Promise<ApiResponse<Note>> {
     const response = await fetch(`${API_BASE_URL}/notes`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ patientId, templateType, transcript }),
     });
-    
+
     return this.handleResponse<Note>(response);
   }
 
@@ -180,35 +180,35 @@ class ApiService {
       method: 'GET',
       headers: this.getAuthHeaders(),
     });
-    
+
     return this.handleResponse<Note[]>(response);
   }
 
-  async getNoteByPatient(patientId: string): Promise<ApiResponse<Note>> {
+  async getNotesByPatient(patientId: string): Promise<ApiResponse<Note[]>> {
     const response = await fetch(`${API_BASE_URL}/notes/patient/${patientId}`, {
       method: 'GET',
       headers: this.getAuthHeaders(),
     });
-    
-    return this.handleResponse<Note>(response);
+
+    return this.handleResponse<Note[]>(response);
   }
 
-  async updateNoteByPatient(patientId: string, updates: Partial<Note>): Promise<ApiResponse<Note>> {
-    const response = await fetch(`${API_BASE_URL}/notes/patient/${patientId}`, {
+  async updateNoteById(noteId: string, updates: Partial<Note>): Promise<ApiResponse<Note>> {
+    const response = await fetch(`${API_BASE_URL}/notes/note/${noteId}`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
       body: JSON.stringify(updates),
     });
-    
+
     return this.handleResponse<Note>(response);
   }
 
-  async deleteNoteByPatient(patientId: string): Promise<ApiResponse<void>> {
-    const response = await fetch(`${API_BASE_URL}/notes/patient/${patientId}`, {
+  async deleteNoteById(noteId: string): Promise<ApiResponse<void>> {
+    const response = await fetch(`${API_BASE_URL}/notes/note/${noteId}`, {
       method: 'DELETE',
       headers: this.getAuthHeaders(),
     });
-    
+
     return this.handleResponse<void>(response);
   }
 
@@ -217,7 +217,7 @@ class ApiService {
       method: 'GET',
       headers: this.getAuthHeaders(),
     });
-    
+
     return this.handleResponse<Note>(response);
   }
 
@@ -225,7 +225,7 @@ class ApiService {
   async uploadAudio(audioFile: File): Promise<ApiResponse<{ audioUrl: string; transcript?: string }>> {
     const formData = new FormData();
     formData.append('audio', audioFile);
-    
+
     const user = this.getStoredUser();
     const response = await fetch(`${API_BASE_URL}/audio/upload`, {
       method: 'POST',
@@ -234,7 +234,7 @@ class ApiService {
       },
       body: formData,
     });
-    
+
     return this.handleResponse<{ audioUrl: string; transcript?: string }>(response);
   }
 
@@ -245,7 +245,7 @@ class ApiService {
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ patientId, transcript, templateType, audioUrl }),
     });
-    
+
     return this.handleResponse<Note>(response);
   }
 

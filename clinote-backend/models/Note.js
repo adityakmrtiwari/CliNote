@@ -49,7 +49,7 @@ noteSchema.pre('save', function(next) {
 
 // Create indexes for better performance and security
 noteSchema.index({ userId: 1 });
-noteSchema.index({ patientId: 1 }, { unique: true }); // Unique index to enforce 1 note per patient
+noteSchema.index({ patientId: 1 }); // Removed unique: true to allow multiple notes per patient
 noteSchema.index({ userId: 1, patientId: 1 });
 noteSchema.index({ userId: 1, createdAt: -1 });
 noteSchema.index({ templateType: 1 });

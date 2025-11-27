@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiService, type Note, type Patient } from '@/lib/api';
+import { useAuth } from '@/components/auth-provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,6 +13,7 @@ import html2canvas from 'html2canvas';
 
 export default function NoteDetailsClient({ noteId }: { noteId: string }) {
   const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   const [note, setNote] = useState<Note | null>(null);
   const [patient, setPatient] = useState<Patient | null>(null);
@@ -23,41 +25,43 @@ export default function NoteDetailsClient({ noteId }: { noteId: string }) {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (!apiService.isAuthenticated()) {
+    if (!authLoading && !isAuthenticated) {
       router.push('/login');
       return;
     }
 
-    const loadData = async () => {
-      setIsLoading(true);
-      try {
-        const noteResult = await apiService.getNoteById(noteId);
-        if (noteResult.success && noteResult.data) {
-          const fetchedNote = noteResult.data;
-          setNote(fetchedNote);
-          setEditedNote(fetchedNote.aiGeneratedNote);
+    if (isAuthenticated) {
+      loadData();
+    }
+  }, [noteId, router, isAuthenticated, authLoading]);
 
-          // patientId may be a string id or a populated Patient object — normalize to string id
-          const patientIdStr = typeof fetchedNote.patientId === 'string' ? fetchedNote.patientId : fetchedNote.patientId._id;
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const noteResult = await apiService.getNoteById(noteId);
+      if (noteResult.success && noteResult.data) {
+        const fetchedNote = noteResult.data;
+        setNote(fetchedNote);
+        setEditedNote(fetchedNote.aiGeneratedNote);
 
-          const patientResult = await apiService.getPatientById(patientIdStr);
-          if (patientResult.success && patientResult.data) {
-            setPatient(patientResult.data);
-          } else {
-            setError("Could not load associated patient data.");
-          }
+        // patientId may be a string id or a populated Patient object — normalize to string id
+        const patientIdStr = typeof fetchedNote.patientId === 'string' ? fetchedNote.patientId : fetchedNote.patientId._id;
+
+        const patientResult = await apiService.getPatientById(patientIdStr);
+        if (patientResult.success && patientResult.data) {
+          setPatient(patientResult.data);
         } else {
-          setError(noteResult.message || "Note not found.");
+          setError("Could not load associated patient data.");
         }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load note details.");
-      } finally {
-        setIsLoading(false);
+      } else {
+        setError(noteResult.message || "Note not found.");
       }
-    };
-    
-    loadData();
-  }, [noteId, router]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load note details.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!note) return;
@@ -70,9 +74,8 @@ export default function NoteDetailsClient({ noteId }: { noteId: string }) {
         assessment: editedNote.assessment || '',
         plan: editedNote.plan || '',
       };
-      
-  const patientIdStr = typeof note.patientId === 'string' ? note.patientId : note.patientId._id;
-  const result = await apiService.updateNoteByPatient(patientIdStr, { aiGeneratedNote: completeAiNote });
+
+      const result = await apiService.updateNoteById(note._id, { aiGeneratedNote: completeAiNote });
 
       if (result.success && result.data) {
         setNote(result.data);
@@ -112,7 +115,7 @@ export default function NoteDetailsClient({ noteId }: { noteId: string }) {
     pdf.save(`${patient?.name || 'note'}-medical-note.pdf`);
   };
 
-  if (isLoading) {
+  if (authLoading || (isAuthenticated && isLoading)) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -135,7 +138,7 @@ export default function NoteDetailsClient({ noteId }: { noteId: string }) {
   return (
     <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <Button onClick={() => router.back()} variant="outline" className="mb-4">
+        <Button onClick={() => router.push(`/patients/${typeof note.patientId === 'string' ? note.patientId : note.patientId._id}`)} variant="outline" className="mb-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Patient
         </Button>

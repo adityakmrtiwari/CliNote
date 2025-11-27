@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Navigation from '@/components/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText, Search, Plus, AlertCircle, Calendar, User, Filter } from 'lucide-react';
 import { apiService, type Note, type Patient } from '@/lib/api';
+import { useAuth } from '@/components/auth-provider';
 
 interface NoteWithPatient extends Note {
   patientName?: string;
@@ -25,16 +25,18 @@ export default function NotesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
-    const userData = apiService.getCurrentUser();
-    if (!userData) {
+    if (!authLoading && !isAuthenticated) {
       router.push('/login');
       return;
     }
 
-    loadNotes();
-  }, [router]);
+    if (isAuthenticated) {
+      loadNotes();
+    }
+  }, [authLoading, isAuthenticated, router]);
 
   useEffect(() => {
     // Filter notes based on search term, status, and template
@@ -67,10 +69,10 @@ export default function NotesPage() {
     try {
       setIsLoading(true);
       setError('');
-      
+
       const result = await apiService.getAllNotes();
-      
-        if (result.success && result.data) {
+
+      if (result.success && result.data) {
         // Load patient information for each note. Backend may return a populated patient object
         const notesWithPatients = await Promise.all(
           result.data.map(async (note) => {
@@ -99,12 +101,12 @@ export default function NotesPage() {
             }
           })
         );
-        
+
         // Sort by most recent
-        const sortedNotes = notesWithPatients.sort((a, b) => 
+        const sortedNotes = notesWithPatients.sort((a, b) =>
           new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
         );
-        
+
         setNotes(sortedNotes);
         setFilteredNotes(sortedNotes);
       } else {
@@ -140,10 +142,9 @@ export default function NotesPage() {
 
   const uniqueTemplates = Array.from(new Set(notes.map(note => note.templateType)));
 
-  if (isLoading) {
+  if (authLoading || (isAuthenticated && isLoading)) {
     return (
       <div className="min-h-screen bg-slate-50">
-        <Navigation />
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -154,10 +155,12 @@ export default function NotesPage() {
     );
   }
 
+  if (!isAuthenticated) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
-      <Navigation />
-      
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
@@ -165,7 +168,7 @@ export default function NotesPage() {
               <h1 className="text-3xl font-bold text-slate-800 mb-2">Medical Notes</h1>
               <p className="text-slate-600">View and manage all your SOAP notes and medical documentation</p>
             </div>
-            <Button 
+            <Button
               onClick={handleCreateNote}
               className="bg-blue-600 hover:bg-blue-700"
             >
@@ -216,8 +219,8 @@ export default function NotesPage() {
             </Select>
 
             {/* Clear Filters */}
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setSearchTerm('');
                 setStatusFilter('all');
@@ -248,13 +251,13 @@ export default function NotesPage() {
                   {notes.length === 0 ? 'No Notes Yet' : 'No Notes Found'}
                 </h3>
                 <p className="text-slate-600 mb-6">
-                  {notes.length === 0 
+                  {notes.length === 0
                     ? 'Start by creating your first medical note.'
                     : 'No notes match your current filters. Try adjusting your search criteria.'
                   }
                 </p>
                 {notes.length === 0 && (
-                  <Button 
+                  <Button
                     onClick={handleCreateNote}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
@@ -268,7 +271,7 @@ export default function NotesPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredNotes.map((note) => (
-              <Card 
+              <Card
                 key={note._id}
                 className="hover:shadow-lg transition-shadow cursor-pointer"
                 onClick={() => handleNoteClick(note._id)}
