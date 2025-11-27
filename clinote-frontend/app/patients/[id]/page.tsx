@@ -1,4 +1,3 @@
-import Navigation from '@/components/navigation';
 import PatientDetailsClient from './PatientDetailsClient';
 
 export default function PatientDetailsPage({ params }: { params: { id: string } }) {
@@ -6,7 +5,6 @@ export default function PatientDetailsPage({ params }: { params: { id: string } 
   // It does not fetch any data itself.
   return (
     <div className="min-h-screen bg-slate-50">
-      <Navigation />
       <PatientDetailsClient patientId={params.id} />
     </div>
   );

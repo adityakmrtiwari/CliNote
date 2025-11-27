@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Navigation from '@/components/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,8 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Mic, Square, Pause, Play, FileText, Loader2, Plus, AlertCircle, User, MicOff } from 'lucide-react';
+import { Mic, Square, Pause, Play, FileText, Loader2, Plus, AlertCircle, User, MicOff, ArrowLeft } from 'lucide-react';
 import { apiService, type Patient, type Note } from '@/lib/api';
+import { useAuth } from '@/components/auth-provider';
 
 // Web Speech API types
 interface SpeechRecognition extends EventTarget {
@@ -75,7 +75,7 @@ export default function CreateNote() {
   const [generatedNote, setGeneratedNote] = useState<Note | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // New patient form
   const [showNewPatientDialog, setShowNewPatientDialog] = useState(false);
   const [newPatientName, setNewPatientName] = useState('');
@@ -97,38 +97,42 @@ export default function CreateNote() {
 
   const templates = [
     'SOAP',
-    'PROGRESS', 
+    'PROGRESS',
     'CONSULTATION',
     'DISCHARGE',
     'General Medicine'
   ];
 
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+
   useEffect(() => {
-    const userData = apiService.getCurrentUser();
-    if (!userData) {
+    if (!authLoading && !isAuthenticated) {
       router.push('/login');
       return;
     }
-    
+    if (isAuthenticated) {
+      loadPatients();
+    }
+
     // Check for Web Speech API support
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
       setIsSupported(true);
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognitionInstance = new SpeechRecognition();
-      
+
       recognitionInstance.continuous = true;
       recognitionInstance.interimResults = true;
       recognitionInstance.lang = 'en-US';
-      
+
       recognitionInstance.onstart = () => {
         console.log('Speech recognition started');
         setError('');
       };
-      
+
       recognitionInstance.onresult = (event: SpeechRecognitionEvent) => {
         let finalTranscript = '';
         let interimTranscript = '';
-        
+
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const result = event.results[i];
           if (result.isFinal) {
@@ -137,20 +141,20 @@ export default function CreateNote() {
             interimTranscript += result[0].transcript;
           }
         }
-        
+
         if (finalTranscript) {
           setTranscript(prev => prev + finalTranscript);
         }
         setInterimTranscript(interimTranscript);
       };
-      
+
       recognitionInstance.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error('Speech recognition error:', event.error);
         setError(`Speech recognition error: ${event.error}`);
         setIsRecording(false);
         setIsPaused(false);
       };
-      
+
       recognitionInstance.onend = () => {
         console.log('Speech recognition ended');
         if (isRecording && !isPaused) {
@@ -158,13 +162,11 @@ export default function CreateNote() {
           recognitionInstance.start();
         }
       };
-      
+
       setRecognition(recognitionInstance);
     } else {
       setError('Speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari.');
     }
-    
-    loadPatients();
   }, [router]);
 
   useEffect(() => {
@@ -193,7 +195,7 @@ export default function CreateNote() {
       setIsLoading(true);
       setError('');
       const result = await apiService.getAllPatients();
-      
+
       if (result.success && result.data) {
         setPatients(result.data);
       } else {
@@ -221,9 +223,9 @@ export default function CreateNote() {
     try {
       setIsCreatingPatient(true);
       setError('');
-      
+
       const result = await apiService.createPatient(newPatientName.trim(), age, newPatientGender);
-      
+
       if (result.success && result.data) {
         setPatients(prev => [...prev, result.data!]);
         setSelectedPatient(result.data._id);
@@ -266,7 +268,7 @@ export default function CreateNote() {
       // Set up audio recording for backend upload
       const recorder = new MediaRecorder(stream);
       const chunks: Blob[] = [];
-      
+
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           chunks.push(event.data);
@@ -302,7 +304,7 @@ export default function CreateNote() {
     // Stop both speech recognition and audio recording
     recognition.stop();
     mediaRecorder.stop();
-    
+
     // Stop audio stream
     if (audioStream) {
       audioStream.getTracks().forEach(track => track.stop());
@@ -311,7 +313,7 @@ export default function CreateNote() {
 
     setIsRecording(false);
     setIsPaused(false);
-    
+
     if (!transcript.trim()) {
       setError('No speech was detected. Please try recording again.');
       return;
@@ -343,10 +345,10 @@ export default function CreateNote() {
             selectedTemplate,
             audioUrl
           );
-          
+
           if (result.success && result.data) {
             setGeneratedNote(result.data);
-            
+
             // Redirect to note view after a short delay
             setTimeout(() => {
               router.push(`/note/${result.data!._id}`);
@@ -391,7 +393,6 @@ export default function CreateNote() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50">
-        <Navigation />
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -404,10 +405,16 @@ export default function CreateNote() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <Navigation />
-      
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
+          <Button
+            onClick={() => router.push('/dashboard')}
+            variant="outline"
+            className="mb-4"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
           <h1 className="text-3xl font-bold text-slate-800 mb-2">Create New Note</h1>
           <p className="text-slate-600">Record your patient encounter and generate SOAP notes using speech recognition</p>
         </div>
@@ -453,7 +460,7 @@ export default function CreateNote() {
                       ))}
                     </SelectContent>
                   </Select>
-                  
+
                   <Dialog open={showNewPatientDialog} onOpenChange={setShowNewPatientDialog}>
                     <DialogTrigger asChild>
                       <Button variant="outline" size="icon">
@@ -577,9 +584,8 @@ export default function CreateNote() {
                   {Array.from({ length: 20 }).map((_, i) => (
                     <div
                       key={i}
-                      className={`bg-blue-600 w-2 rounded-full transition-all duration-300 ${
-                        isRecording && !isPaused ? 'animate-pulse' : ''
-                      }`}
+                      className={`bg-blue-600 w-2 rounded-full transition-all duration-300 ${isRecording && !isPaused ? 'animate-pulse' : ''
+                        }`}
                       style={{
                         height: isRecording && !isPaused ? `${Math.random() * 40 + 20}px` : '16px',
                         animationDelay: `${i * 0.1}s`

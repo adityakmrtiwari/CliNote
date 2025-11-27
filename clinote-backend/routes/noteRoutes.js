@@ -1,34 +1,26 @@
 const express = require('express');
 const router = express.Router();
 const {
-  createOrUpdateNote,
-  getNoteByPatient,
-  getAllNotes,
-  getNoteById,
-  updateNoteByPatient,
-  deleteNoteByPatient,
-  // Legacy exports for backward compatibility
   createNote,
   getNotesByPatient,
-  updateNote,
-  deleteNote
+  getAllNotes,
+  getNoteById,
+  updateNoteById,
+  deleteNoteById
 } = require('../controllers/noteController');
 
 const { protect } = require('../middlewares/authMiddleware');
 
-// Routes for the new workflow (1 patient = 1 note)
-router.post('/', protect, createOrUpdateNote); // Create or update note
-router.get('/all', protect, getAllNotes); // Get all notes for current doctor
+// Routes
+router.post('/', protect, createNote); // Always create new note
+router.get('/all', protect, getAllNotes); // Get all notes
 
-// Patient-specific note routes (recommended)
-router.get('/patient/:patientId', protect, getNoteByPatient); // Get note for specific patient
-router.put('/patient/:patientId', protect, updateNoteByPatient); // Update note for specific patient
-router.delete('/patient/:patientId', protect, deleteNoteByPatient); // Delete note for specific patient
+// Patient-specific routes
+router.get('/patient/:patientId', protect, getNotesByPatient); // Get ALL notes for a patient
 
-// Legacy routes for backward compatibility
+// Note-specific routes (by Note ID)
 router.get('/note/:id', protect, getNoteById);
-router.put('/note/:id', protect, updateNote);
-router.delete('/note/:id', protect, deleteNote);
-router.get('/:patientId', protect, getNotesByPatient);
+router.put('/note/:id', protect, updateNoteById);
+router.delete('/note/:id', protect, deleteNoteById);
 
 module.exports = router;
