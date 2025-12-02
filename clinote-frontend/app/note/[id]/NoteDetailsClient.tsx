@@ -9,18 +9,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Save, Download, Eye, User, Calendar, AlertCircle, Loader2 } from 'lucide-react';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 
 export default function NoteDetailsClient({ noteId }: { noteId: string }) {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
 
   const [note, setNote] = useState<Note | null>(null);
   const [patient, setPatient] = useState<Patient | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
-  const [editedNote, setEditedNote] = useState<Partial<Note['aiGeneratedNote']>>({});
+  const [editedNote, setEditedNote] = useState<Note['aiGeneratedNote']>({
+    summary: '',
+    subjective: '',
+    objective: '',
+    assessment: '',
+    plan: ''
+  });
   const [showTranscript, setShowTranscript] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -69,6 +74,7 @@ export default function NoteDetailsClient({ noteId }: { noteId: string }) {
     setError('');
     try {
       const completeAiNote = {
+        summary: editedNote.summary || '',
         subjective: editedNote.subjective || '',
         objective: editedNote.objective || '',
         assessment: editedNote.assessment || '',
@@ -98,21 +104,114 @@ export default function NoteDetailsClient({ noteId }: { noteId: string }) {
     setError('');
   };
 
+
+
   /** ✅ Generate PDF of the note details */
-  const handleDownloadPDF = async () => {
-    const element = document.getElementById('note-content');
-    if (!element) return;
+  const handleDownloadPDF = () => {
+    if (!note || !patient) return;
 
-    const canvas = await html2canvas(element, { scale: 2 });
-    const imgData = canvas.toDataURL('image/png');
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 20;
+    const contentWidth = pageWidth - (margin * 2);
+    let yPos = 20;
 
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const imgProps = pdf.getImageProperties(imgData);
-    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+    // Helper to add text and advance cursor
+    const addText = (text: string, fontSize: number, isBold: boolean = false, align: 'left' | 'center' = 'left') => {
+      doc.setFontSize(fontSize);
+      doc.setFont('helvetica', isBold ? 'bold' : 'normal');
 
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`${patient?.name || 'note'}-medical-note.pdf`);
+      if (align === 'center') {
+        doc.text(text, pageWidth / 2, yPos, { align: 'center' });
+      } else {
+        doc.text(text, margin, yPos);
+      }
+      yPos += (fontSize / 2) + 2; // Line height approximation
+    };
+
+    // Helper to add wrapped text block
+    const addBlock = (title: string, content: string) => {
+      // Check for page break
+      if (yPos > 250) {
+        doc.addPage();
+        yPos = 20;
+      }
+
+      // Title
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text(title, margin, yPos);
+      yPos += 7;
+
+      // Content
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 60, 60);
+
+      const splitText = doc.splitTextToSize(content || 'N/A', contentWidth);
+
+      // Check if content fits on page, else add page
+      if (yPos + (splitText.length * 5) > 280) {
+        doc.addPage();
+        yPos = 20;
+      }
+
+      doc.text(splitText, margin, yPos);
+      yPos += (splitText.length * 5) + 10; // Spacing after block
+    };
+
+    // --- Header ---
+    addText('MEDICAL SOAP NOTE', 18, true, 'center');
+    yPos += 10;
+
+    // --- Metadata ---
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 10;
+
+    const dateStr = new Date(note.createdAt).toLocaleDateString();
+    const timeStr = new Date(note.createdAt).toLocaleTimeString();
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+
+    // Left Column
+    doc.text(`Doctor: Dr. ${user?.name || 'Unknown'}`, margin, yPos);
+    doc.text(`Patient: ${patient.name}`, margin, yPos + 6);
+    doc.text(`Patient ID: ${typeof note.patientId === 'string' ? note.patientId : note.patientId._id}`, margin, yPos + 12);
+
+    // Right Column
+    doc.text(`Date: ${dateStr}`, pageWidth - 60, yPos);
+    doc.text(`Time: ${timeStr}`, pageWidth - 60, yPos + 6);
+    doc.text(`Type: ${note.templateType}`, pageWidth - 60, yPos + 12);
+
+    yPos += 25;
+    doc.line(margin, yPos - 5, pageWidth - margin, yPos - 5);
+
+    // --- SOAP Sections ---
+    const sections = [
+      { title: 'Summary', content: isEditing ? editedNote.summary : note.aiGeneratedNote.summary },
+      { title: 'Subjective', content: isEditing ? editedNote.subjective : note.aiGeneratedNote.subjective },
+      { title: 'Objective', content: isEditing ? editedNote.objective : note.aiGeneratedNote.objective },
+      { title: 'Assessment', content: isEditing ? editedNote.assessment : note.aiGeneratedNote.assessment },
+      { title: 'Plan', content: isEditing ? editedNote.plan : note.aiGeneratedNote.plan },
+    ];
+
+    sections.forEach(section => {
+      addBlock(section.title, section.content || '');
+    });
+
+    // --- Footer ---
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Page ${i} of ${pageCount} - Generated by CliNote`, pageWidth / 2, 290, { align: 'center' });
+    }
+
+    doc.save(`${patient.name.replace(/\s+/g, '_')}_SOAP_Note_${dateStr.replace(/\//g, '-')}.pdf`);
   };
 
   if (authLoading || (isAuthenticated && isLoading)) {
@@ -201,7 +300,7 @@ export default function NoteDetailsClient({ noteId }: { noteId: string }) {
       )}
 
       <div id="note-content" className="space-y-6">
-        {(['subjective', 'objective', 'assessment', 'plan'] as const).map((section) => (
+        {(['summary', 'subjective', 'objective', 'assessment', 'plan'] as const).map((section) => (
           <Card key={section}>
             <CardHeader>
               <CardTitle className="text-blue-600 capitalize">{section}</CardTitle>

@@ -15,13 +15,14 @@ const noteSchema = new mongoose.Schema({
   templateType: {
     type: String,
     required: true,
-    enum: ['SOAP', 'PROGRESS', 'CONSULTATION', 'DISCHARGE','General Medicine'] // Define allowed template types
+    enum: ['SOAP', 'PROGRESS', 'CONSULTATION', 'DISCHARGE', 'General Medicine'] // Define allowed template types
   },
   transcript: {
     type: String,
     required: true,
   },
   aiGeneratedNote: {
+    summary: { type: String, default: '' },
     subjective: { type: String, default: '' },
     objective: { type: String, default: '' },
     assessment: { type: String, default: '' },
@@ -42,7 +43,7 @@ const noteSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Middleware to update lastUpdated on save
-noteSchema.pre('save', function(next) {
+noteSchema.pre('save', function (next) {
   this.lastUpdated = new Date();
   next();
 });

@@ -32,6 +32,7 @@ interface Note {
   templateType: 'SOAP' | 'PROGRESS' | 'CONSULTATION' | 'DISCHARGE' | 'General Medicine';
   transcript: string;
   aiGeneratedNote: {
+    summary: string;
     subjective: string;
     objective: string;
     assessment: string;
