@@ -29,6 +29,7 @@ async function retryGeminiCall(apiCall, retries = 3, delay = 2000) {
 // Normalize aiGeneratedNote fields so they match the schema (strings)
 function sanitizeAIGeneratedNote(obj) {
   if (!obj || typeof obj !== 'object') return {
+    summary: '',
     subjective: '',
     objective: '',
     assessment: '',
@@ -43,6 +44,7 @@ function sanitizeAIGeneratedNote(obj) {
   };
 
   return {
+    summary: normalize(obj.summary),
     subjective: normalize(obj.subjective),
     objective: normalize(obj.objective),
     assessment: normalize(obj.assessment),
@@ -70,38 +72,58 @@ exports.generateAndSaveSOAPNote = async (req, res) => {
     });
 
     const prompt = `
-You are a professional medical assistant. Based on the following transcript and template type "${templateType}", generate a SOAP note.
+You are a Senior Clinical Documentation Specialist. Your task is to generate a professional, clinically accurate, and **readable** SOAP note based on the provided transcript and template type "${templateType}".
 
 Transcript:
 ---
 ${transcript}
 ---
 
-Please respond in **JSON only** with these 4 keys: 
+Instructions:
+1.  **Analyze** the transcript thoroughly.
+2.  **Extract** relevant clinical information.
+3.  **Formulate** the response in **clear, professional language**. Avoid overly dense medical jargon where simple terms suffice (e.g., "runny nose" is acceptable if clear, but maintain a professional tone).
+4.  **Structure** the output into the following JSON fields:
 
-1. "subjective": concise patient complaints or history in 1-2 sentences.
-2. "objective": key measurable signs, vitals, or test results in bullet points.
-3. "assessment": main diagnosis or evaluation in 1 sentence.
-4. "plan": clear action steps or treatment plan in bullet points.
+    *   **"summary"**: A comprehensive but concise abstract of the encounter. Include the patient's demographics (if available), chief complaint, key history, major findings, and the plan.
+    *   **"subjective"**: A narrative description including:
+        *   **Chief Complaint (CC)**: The primary reason for the visit.
+        *   **History**: Key details of the present illness (duration, severity, symptoms).
+        *   **Review of Systems**: Only relevant positives and negatives.
+        *   *Format*: Clear sentences.
+    *   **"objective"**: Measurable, observable data including:
+        *   **Vital Signs**: (if mentioned).
+        *   **Physical Exam**: Key findings observed.
+        *   **Diagnostics**: Labs or imaging results.
+        *   *Format*: Bullet points.
+    *   **"assessment"**:
+        *   **Diagnosis**: Primary and potential alternative diagnoses.
+        *   *Format*: Concise statement.
+    *   **"plan"**:
+        *   **Treatment**: Medications and therapies.
+        *   **Advice**: Patient education and follow-up instructions.
+        *   *Format*: Bullet points.
+
+Constraints:
+*   **JSON ONLY**: Respond with a valid JSON object containing keys: "summary", "subjective", "objective", "assessment", "plan".
+*   **No Hallucinations**: If information is not present in the transcript, state "Not reported" or omit the specific detail.
+*   **Clarity**: Prioritize clarity and readability over complex terminology.
 
 Format example:
 {
-  "subjective": "Patient complains of mild headache and dizziness for 2 days.",
+  "summary": "45-year-old male presenting with 3-day history of headache...",
+  "subjective": "CC: Headache.\\n\\nPatient reports a 3-day history of throbbing frontal headache...",
   "objective": [
-    "- Blood pressure: 120/80 mmHg",
-    "- Temperature: 98.6°F"
+    "- BP 130/85, HR 78",
+    "- Normal eye movement, no light sensitivity"
   ],
-  "assessment": "Likely tension headache.",
+  "assessment": "Tension Headache",
   "plan": [
-    "- Advise hydration and rest",
-    "- Prescribe acetaminophen 500mg as needed",
-    "- Follow up in 3 days"
+    "- Ibuprofen 400mg as needed",
+    "- Hydration and rest",
+    "- Return if worse"
   ]
 }
-
-Ensure:
-- JSON is properly formatted and parseable.
-- Keep all fields short, clear, and medically relevant.
 `;
 
     // Retry Gemini request if overloaded
